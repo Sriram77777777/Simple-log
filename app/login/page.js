@@ -2,30 +2,53 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation'; 
+
+
 
 export default function LoginPage() {
+    const router = useRouter(); 
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsLoading(true);
+  setError('');
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', 
+      body: JSON.stringify(formData),
+    });
 
-    try {
-      // TODO: Implement login API call
-      console.log('Login attempt:', formData);
-      // Placeholder for actual login logic
-    } catch (err) {
-      setError('Invalid username or password. Please try again.');
-    } finally {
-      setIsLoading(false);
+    const data = await res.json();
+
+    if (res.ok) {
+      if (data.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/dashboard');
+      }
+
+    } else {
+      setError(data.message || 'Invalid credentials. Try again.');
     }
-  };
+  } catch (err) {
+    console.error('Login error:', err);
+    setError('Something went wrong. Please try again.');
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const handleChange = (e) => {
     setFormData(prev => ({

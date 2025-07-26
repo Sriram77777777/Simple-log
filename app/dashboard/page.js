@@ -2,74 +2,102 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
-  const [user, setUser] = useState({ username: 'User' }); // Placeholder user
-  const [notes, setNotes] = useState([
-    // Sample notes for demonstration
-    {
-      id: 1,
-      title: 'Welcome Note',
-      content: 'This is your first note. You can edit or delete it anytime.'
-    },
-    {
-      id: 2,
-      title: 'Meeting Notes',
-      content: 'Discussed project requirements and timeline.'
-    }
-  ]);
+  const [user, setUser] = useState(null);
+  const [notes, setNotes] = useState([]);
   const [newNote, setNewNote] = useState({ title: '', content: '' });
   const [editingNote, setEditingNote] = useState(null);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const router = useRouter();
 
-  const handleAddNote = () => {
+  useEffect(() => {
+    async function fetchUserAndNotes() {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+
+      if (!data.isLoggedIn) {
+        router.push('/login');
+      } else {
+        setUser({ username: data.username });
+        await fetchNotes();
+      }
+    }
+
+    async function fetchNotes() {
+      const res = await fetch('/api/notes');
+      const data = await res.json();
+      setNotes(data.notes || []);
+    }
+
+    fetchUserAndNotes();
+  }, []);
+
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    router.push('/login');
+  };
+
+  const handleAddNote = async () => {
     if (newNote.title.trim() && newNote.content.trim()) {
-      const note = {
-        id: Date.now(),
-        title: newNote.title,
-        content: newNote.content
-      };
-      setNotes(prev => [note, ...prev]);
-      setNewNote({ title: '', content: '' });
-      setIsAddingNote(false);
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newNote),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotes(prev => [data.note, ...prev]);
+        setNewNote({ title: '', content: '' });
+        setIsAddingNote(false);
+      } else {
+        alert(data.message || 'Error adding note');
+      }
     }
   };
 
-  const handleEditNote = (note) => {
-    setEditingNote({ ...note });
+  const handleEditNote = (note) => setEditingNote({ ...note });
+
+  const handleSaveEdit = async () => {
+    const res = await fetch(`/api/notes/${editingNote._id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(editingNote),
+    });
+    const data = await res.json();
+
+    if (res.ok) {
+      setNotes(prev => prev.map(n => (n._id === data.note._id ? data.note : n)));
+      setEditingNote(null);
+    } else {
+      alert(data.message || 'Failed to update note');
+    }
   };
 
-  const handleSaveEdit = () => {
-    setNotes(prev => prev.map(note => 
-      note.id === editingNote.id ? editingNote : note
-    ));
-    setEditingNote(null);
-  };
-
-  const handleDeleteNote = (id) => {
+  const handleDeleteNote = async (id) => {
     if (confirm('Are you sure you want to delete this note?')) {
-      setNotes(prev => prev.filter(note => note.id !== id));
+      const res = await fetch(`/api/notes/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setNotes(prev => prev.filter(note => note._id !== id));
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to delete');
+      }
     }
   };
 
-  const handleLogout = () => {
-    // TODO: Implement logout logic
-    console.log('Logging out...');
-  };
+  if (!user) return <p>Loading...</p>;
 
   return (
     <div className="main-layout">
       <nav className="navbar">
         <div className="container">
           <div className="navbar-content">
-            <Link href="/" className="navbar-brand">
-              Simple Audit Log Viewer
-            </Link>
+            <Link href="/" className="navbar-brand">Simple Audit Log Viewer</Link>
             <div className="navbar-nav">
               <span className="text-muted">Welcome, {user.username}</span>
-              <button onClick={handleLogout} className="button button-secondary button-small">
-                Logout
-              </button>
+              <button onClick={handleLogout} className="button button-secondary button-small">Logout</button>
             </div>
           </div>
         </div>
@@ -84,20 +112,17 @@ export default function DashboardPage() {
 
           {/* Notes Section */}
           <div className="card">
-            <div className="card-header">
-              <div className="flex justify-between items-center">
-                <h2 className="card-title">Your Notes</h2>
-                <button 
-                  onClick={() => setIsAddingNote(true)}
-                  className="button button-primary"
-                  disabled={isAddingNote}
-                >
-                  Add New Note
-                </button>
-              </div>
+            <div className="card-header flex justify-between items-center">
+              <h2 className="card-title">Your Notes</h2>
+              <button
+                onClick={() => setIsAddingNote(true)}
+                className="button button-primary" style={{margin:'10px'}}
+                disabled={isAddingNote}
+              >
+                Add New Note
+              </button>
             </div>
 
-            {/* Add New Note Form */}
             {isAddingNote && (
               <div className="card mb-3" style={{ backgroundColor: 'var(--secondary)' }}>
                 <div className="form-group">
@@ -120,23 +145,12 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleAddNote} className="button button-primary button-small">
-                    Save Note
-                  </button>
-                  <button 
-                    onClick={() => {
-                      setIsAddingNote(false);
-                      setNewNote({ title: '', content: '' });
-                    }}
-                    className="button button-secondary button-small"
-                  >
-                    Cancel
-                  </button>
+                  <button onClick={handleAddNote} className="button button-primary button-small">Save Note</button>
+                  <button onClick={() => { setIsAddingNote(false); setNewNote({ title: '', content: '' }); }} className="button button-secondary button-small">Cancel</button>
                 </div>
               </div>
             )}
 
-            {/* Notes List */}
             <div className="note-list">
               {notes.length === 0 ? (
                 <div className="text-center text-muted" style={{ padding: '2rem' }}>
@@ -144,10 +158,9 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 notes.map(note => (
-                  <div key={note.id} className="note-item">
-                    {editingNote && editingNote.id === note.id ? (
-                      // Edit Mode
-                      <div>
+                  <div key={note._id} className="note-item">
+                    {editingNote && editingNote._id === note._id ? (
+                      <>
                         <div className="form-group">
                           <input
                             type="text"
@@ -164,37 +177,19 @@ export default function DashboardPage() {
                           />
                         </div>
                         <div className="note-actions">
-                          <button onClick={handleSaveEdit} className="button button-primary button-small">
-                            Save
-                          </button>
-                          <button 
-                            onClick={() => setEditingNote(null)}
-                            className="button button-secondary button-small"
-                          >
-                            Cancel
-                          </button>
+                          <button onClick={handleSaveEdit} className="button button-primary button-small">Save</button>
+                          <button onClick={() => setEditingNote(null)} className="button button-secondary button-small">Cancel</button>
                         </div>
-                      </div>
+                      </>
                     ) : (
-                      // View Mode
-                      <div>
+                      <>
                         <div className="note-title">{note.title}</div>
                         <div className="note-content">{note.content}</div>
                         <div className="note-actions">
-                          <button 
-                            onClick={() => handleEditNote(note)}
-                            className="button button-secondary button-small"
-                          >
-                            Edit
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="button button-danger button-small"
-                          >
-                            Delete
-                          </button>
+                          <button onClick={() => handleEditNote(note)} className="button button-secondary button-small">Edit</button>
+                          <button onClick={() => handleDeleteNote(note._id)} className="button button-danger button-small">Delete</button>
                         </div>
-                      </div>
+                      </>
                     )}
                   </div>
                 ))

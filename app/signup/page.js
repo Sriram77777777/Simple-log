@@ -17,11 +17,23 @@ export default function SignupPage() {
     setError('');
 
     try {
-      // TODO: Implement signup API call
-      console.log('Signup attempt:', formData);
-      // Placeholder for actual signup logic
+      const res = await fetch('/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || 'Signup failed');
+      }
+
+      window.location.href = '/login';
     } catch (err) {
-      setError('Signup failed. Please try again.');
+      setError(err.message);
     } finally {
       setIsLoading(false);
     }
