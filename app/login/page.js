@@ -140,12 +140,13 @@ const handleSubmit = async (e) => {
             </form>
 
             <div className="mt-4 text-center">
-              <p className="text-muted">
-                Don't have an account?{' '}
-                <Link href="/signup" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-                  Sign up here
-                </Link>
+             <p className="text-muted">
+                  Don&apos;t have an account?{' '}
+                  <Link href="/signup" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                    Sign up here
+                  </Link>
               </p>
+
             </div>
           </div>
         </main>
