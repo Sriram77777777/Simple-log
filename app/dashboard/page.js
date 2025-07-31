@@ -13,26 +13,26 @@ export default function DashboardPage() {
   const router = useRouter();
 
   useEffect(() => {
-    async function fetchUserAndNotes() {
-      const res = await fetch('/api/me');
-      const data = await res.json();
+  async function fetchUserAndNotes() {
+    const res = await fetch('/api/me');
+    const data = await res.json();
 
-      if (!data.isLoggedIn) {
-        router.push('/login');
-      } else {
-        setUser({ username: data.username });
-        await fetchNotes();
-      }
+    if (!data.isLoggedIn) {
+      router.push('/login');
+    } else {
+      setUser({ username: data.username });
+      await fetchNotes();
     }
+  }
 
-    async function fetchNotes() {
-      const res = await fetch('/api/notes');
-      const data = await res.json();
-      setNotes(data.notes || []);
-    }
+  async function fetchNotes() {
+    const res = await fetch('/api/notes');
+    const data = await res.json();
+    setNotes(data.notes || []);
+  }
 
-    fetchUserAndNotes();
-  }, []);
+  fetchUserAndNotes();
+}, [router]);
 
   const handleLogout = async () => {
     await fetch('/api/logout', { method: 'POST' });
