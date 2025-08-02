@@ -5,7 +5,8 @@ import { useState } from 'react';
 
 export default function SignupPage() {
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
+    username: '',  
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -22,7 +23,6 @@ export default function SignupPage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify(formData),
       });
 
@@ -40,9 +40,9 @@ export default function SignupPage() {
   };
 
   const handleChange = (e) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
@@ -65,30 +65,47 @@ export default function SignupPage() {
 
       <div className="container">
         <main className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
-          <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
+          <div className="card" style={{ maxWidth: 400, width: '100%' }}>
             <div className="card-header">
               <h1 className="card-title text-center">Create Account</h1>
-              <p className="card-description text-center">
-                Sign up to start managing your notes
-              </p>
+              <p className="card-description text-center">Sign up to start managing your notes</p>
             </div>
 
             {error && (
-              <div className="mb-3" style={{ 
-                padding: '0.75rem', 
-                backgroundColor: '#fee', 
-                border: '1px solid var(--error)', 
-                borderRadius: 'var(--radius)', 
-                color: 'var(--error)' 
-              }}>
+              <div
+                className="mb-3"
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: '#fee',
+                  border: '1px solid var(--error)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--error)',
+                }}
+              >
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit}>
               <div className="form-group">
+                <label htmlFor="email" className="form-label">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  className="form-input"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="username" className="form-label">
-                  Username
+                  Username (optional)
                 </label>
                 <input
                   type="text"
@@ -97,7 +114,6 @@ export default function SignupPage() {
                   className="form-input"
                   value={formData.username}
                   onChange={handleChange}
-                  required
                   placeholder="Enter your username"
                 />
               </div>

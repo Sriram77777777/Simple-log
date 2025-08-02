@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'; // adjust path as needed
 
 export async function GET() {
-  const cookieStore = await cookies();
-const session = cookieStore.get('session');
+  const session = await getServerSession(authOptions);
 
   if (!session) {
-    return NextResponse.json({ isLoggedIn: false, username: null }, { status: 200 });
+    return NextResponse.json({ isLoggedIn: false, user: null }, { status: 200 });
   }
 
-  try {
-    const parsed = JSON.parse(session.value);
-    return NextResponse.json({ isLoggedIn: true, username: parsed.username }, { status: 200 });
-  } catch (err) {
-    return NextResponse.json({ isLoggedIn: false, username: null }, { status: 400 });
-  }
+  const userInfo = {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+    role: session.user.role,
+  };
+
+  return NextResponse.json({ isLoggedIn: true, user: userInfo }, { status: 200 });
 }

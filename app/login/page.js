@@ -2,58 +2,54 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation'; 
-
-
+import { useRouter } from 'next/navigation';
+import { signIn, getSession } from 'next-auth/react';
 
 export default function LoginPage() {
-    const router = useRouter(); 
+  const router = useRouter();
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsLoading(true);
-  setError('');
 
-  try {
-    const res = await fetch('/api/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', 
-      body: JSON.stringify(formData),
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    const res = await signIn('credentials', {
+      redirect: false,
+      email: formData.email,
+      password: formData.password,
     });
 
-    const data = await res.json();
-
-    if (res.ok) {
-      if (data.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/dashboard');
-      }
-
-    } else {
-      setError(data.message || 'Invalid credentials. Try again.');
-    }
-  } catch (err) {
-    console.error('Login error:', err);
-    setError('Something went wrong. Please try again.');
-  } finally {
     setIsLoading(false);
-  }
-};
 
+    if (!res) {
+      setError('Unexpected error. Please try again.');
+      return;
+    }
+
+    if (res.error) {
+      setError(res.error || 'Invalid credentials. Try again.');
+    } else {
+      // Get session to check user role
+      const session = await getSession();
+
+      if (session?.user?.role === 'admin') {
+        router.push('/admin');   // Redirect admin user to /admin
+      } else {
+        router.push('/dashboard'); // Redirect regular user to /dashboard
+      }
+    }
+  };
 
   const handleChange = (e) => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     }));
   };
 
@@ -79,37 +75,39 @@ const handleSubmit = async (e) => {
           <div className="card" style={{ maxWidth: '400px', width: '100%' }}>
             <div className="card-header">
               <h1 className="card-title text-center">Welcome Back</h1>
-              <p className="card-description text-center">
-                Sign in to access your notes and dashboard
-              </p>
+              <p className="card-description text-center">Sign in to access your notes and dashboard</p>
             </div>
 
             {error && (
-              <div className="mb-3" style={{ 
-                padding: '0.75rem', 
-                backgroundColor: '#fee', 
-                border: '1px solid var(--error)', 
-                borderRadius: 'var(--radius)', 
-                color: 'var(--error)' 
-              }}>
+              <div
+                className="mb-3"
+                style={{
+                  padding: '0.75rem',
+                  backgroundColor: '#fee',
+                  border: '1px solid var(--error)',
+                  borderRadius: 'var(--radius)',
+                  color: 'var(--error)',
+                }}
+              >
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit}>
               <div className="form-group">
-                <label htmlFor="username" className="form-label">
-                  Username
+                <label htmlFor="email" className="form-label">
+                  Email
                 </label>
                 <input
-                  type="text"
-                  id="username"
-                  name="username"
+                  type="email"
+                  id="email"
+                  name="email"
                   className="form-input"
-                  value={formData.username}
+                  value={formData.email}
                   onChange={handleChange}
                   required
-                  placeholder="Enter your username"
+                  placeholder="Enter your email"
+                  autoComplete="email"
                 />
               </div>
 
@@ -126,6 +124,7 @@ const handleSubmit = async (e) => {
                   onChange={handleChange}
                   required
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                 />
               </div>
 
@@ -134,19 +133,19 @@ const handleSubmit = async (e) => {
                 className="button button-primary"
                 style={{ width: '100%' }}
                 disabled={isLoading}
+                aria-busy={isLoading}
               >
                 {isLoading ? 'Signing In...' : 'Login'}
               </button>
             </form>
 
             <div className="mt-4 text-center">
-             <p className="text-muted">
-                  Don&apos;t have an account?{' '}
-                  <Link href="/signup" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
-                    Sign up here
-                  </Link>
+              <p className="text-muted">
+                Don&apos;t have an account?{' '}
+                <Link href="/signup" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                  Sign up here
+                </Link>
               </p>
-
             </div>
           </div>
         </main>

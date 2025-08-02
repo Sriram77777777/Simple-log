@@ -1,76 +1,88 @@
+import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
-import User from '@/app/models/User';
-import Log from '@/app/models/Log';
-import { cookies } from 'next/headers';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import dbConnect from '@/app/lib/db';
 import Note from '@/app/models/Note';
+import User from '@/app/models/User';
+import Log from '@/app/models/Log';
 
 export async function GET() {
-  try {
-    const cookieStore = await cookies();
-    const session = cookieStore.get('session');
+  const session = await getServerSession(authOptions);
 
-    if (!session) {
-      return NextResponse.json({ message: 'Unauthorized - No session' }, { status: 401 });
-    }
-
-    const parsed = JSON.parse(session.value || '{}');
-    const userId = parsed.userId;
-
-    if (!userId) {
-      return NextResponse.json({ message: 'Unauthorized - No user ID in session' }, { status: 401 });
-    }
-
-    await dbConnect();
-
-    const notes = await Note.find({ userId });
-
-    return NextResponse.json({ notes }, { status: 200 });
-  } catch (error) {
-    console.error('GET /api/notes error:', error);
-    return NextResponse.json({ message: 'Server error' }, { status: 500 });
-  }
-}
-export async function POST(req) {
-  const cookieStore = await cookies(); // ✅ correct
-  const sessionCookie = cookieStore.get('session');
-
-
-  if (!sessionCookie) {
+  if (!session) {
     return NextResponse.json({ message: 'Unauthorized - No session' }, { status: 401 });
   }
 
-  let session;
-  try {
-    session = JSON.parse(sessionCookie.value);
-  } catch (err) {
-    return NextResponse.json({ message: 'Invalid session data' }, { status: 401 });
+  const userId = session.user.id;
+
+  if (!userId) {
+    return NextResponse.json({ message: 'Unauthorized - No user ID in session' }, { status: 401 });
   }
 
-  const { username } = session;
-  if (!username) {
-    return NextResponse.json({ message: 'Unauthorized - No username in session' }, { status: 401 });
+  await dbConnect();
+
+  let notes;
+
+  if (userId === 'admin') {
+    notes = await Note.find({});
+  } else {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
+    }
+    notes = await Note.find({ userId });
+  }
+
+  return NextResponse.json({ notes }, { status: 200 });
+}
+
+export async function POST(req) {
+  const session = await getServerSession(authOptions);
+
+  if (!session) {
+    return NextResponse.json({ message: 'Unauthorized - No session' }, { status: 401 });
   }
 
   const { title, content } = await req.json();
 
-  await dbConnect();
+  const username = session.user.name || session.user.email;
+  const userId = session.user.id;
 
-  // ✅ Find the user by username to get userId
-  const user = await User.findOne({ username });
-  if (!user) {
-    return NextResponse.json({ message: 'User not found' }, { status: 404 });
+  if (!username || !userId) {
+    return NextResponse.json({ message: 'Unauthorized - Missing user info in session' }, { status: 401 });
   }
 
-  // ✅ Create the note with userId
-  const note = await Note.create({
-    title,
-    content,
-    userId: user._id,
-  });
+  await dbConnect();
 
-  // ✅ Log the action
-  await Log.create({ username, action: 'ADD_NOTE' });
+  if (userId === 'admin') {
+    const note = await Note.create({
+      title,
+      content,
+    });
 
-  return NextResponse.json({ message: 'Note created', note }, { status: 201 });
+    await Log.create({ username, action: 'ADD_NOTE' });
+
+    return NextResponse.json({ message: 'Note created (admin)', note }, { status: 201 });
+  } else {
+    
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    const note = await Note.create({
+      title,
+      content,
+      userId,
+    });
+
+    await Log.create({ username, action: 'ADD_NOTE' });
+
+    return NextResponse.json({ message: 'Note created', note }, { status: 201 });
+  }
 }

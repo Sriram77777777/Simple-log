@@ -1,43 +1,57 @@
+import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'; 
 import { connectToDatabase as dbConnect } from '@/app/lib/db';
 import Note from '@/app/models/Note';
 import Log from '@/app/models/Log';
-import { cookies } from 'next/headers';
 
-
-// ✅ Helper to extract ID from URL
 function getNoteIdFromRequestUrl(request) {
   const url = new URL(request.url);
-  return url.pathname.split('/').pop(); // gets [id] from /api/notes/[id]
+  return url.pathname.split('/').pop();
 }
 
 export async function PUT(req) {
-  const cookieStore =await cookies();
-  const sessionCookie = cookieStore.get('session');
+  const session = await getServerSession(authOptions);
 
-  if (!sessionCookie) {
+  if (!session) {
     return NextResponse.json({ message: 'Unauthorized - No session' }, { status: 401 });
   }
+  
+  const userId = session.user.id;
+  const username = session.user.name || session.user.email;
 
-  const session = JSON.parse(sessionCookie.value || '{}');
-  const { username } = session;
-  if (!username) {
-    return NextResponse.json({ message: 'Unauthorized - No username in session' }, { status: 401 });
+  if (!userId || !username) {
+    return NextResponse.json({ message: 'Unauthorized - Missing user info in session' }, { status: 401 });
   }
 
-  const noteId = getNoteIdFromRequestUrl(req); // ✅ get ID from URL
+  const noteId = getNoteIdFromRequestUrl(req);
   const { title, content } = await req.json();
 
   await dbConnect();
 
-  const note = await Note.findByIdAndUpdate(
-    noteId,
-    { title, content },
-    { new: true }
-  );
+  let note;
+
+  if (userId === 'admin') {
+    note = await Note.findOneAndUpdate(
+      { _id: noteId },
+      { title, content },
+      { new: true }
+    );
+  } else {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
+    }
+
+    note = await Note.findOneAndUpdate(
+      { _id: noteId, userId },
+      { title, content },
+      { new: true }
+    );
+  }
 
   if (!note) {
-    return NextResponse.json({ message: 'Note not found' }, { status: 404 });
+    return NextResponse.json({ message: 'Note not found or unauthorized' }, { status: 404 });
   }
 
   await Log.create({ username, action: 'EDIT_NOTE' });
@@ -46,20 +60,35 @@ export async function PUT(req) {
 }
 
 
-export async function DELETE(req, context) {
-  const cookieStore = await cookies(); // ✅ await cookies()
-  const sessionCookie = cookieStore.get('session');
+export async function DELETE(req) {
+  const session = await getServerSession(authOptions);
 
-  if (!sessionCookie) {
+  if (!session) {
     return NextResponse.json({ message: 'Unauthorized - No session' }, { status: 401 });
   }
 
-  const { username, userId } = JSON.parse(sessionCookie.value);
-   const noteId = getNoteIdFromRequestUrl(req);  // ✅ use context.params.id properly
+  const userId = session.user.id;
+  const username = session.user.name || session.user.email;
+
+  if (!userId || !username) {
+    return NextResponse.json({ message: 'Unauthorized - Missing user info in session' }, { status: 401 });
+  }
+
+  const noteId = getNoteIdFromRequestUrl(req);
 
   await dbConnect();
 
-  const deletedNote = await Note.findOneAndDelete({ _id: noteId, userId });
+  let deletedNote;
+
+  if (userId === 'admin') {
+    deletedNote = await Note.findOneAndDelete({ _id: noteId });
+  } else {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json({ message: 'Invalid user ID' }, { status: 400 });
+    }
+
+    deletedNote = await Note.findOneAndDelete({ _id: noteId, userId });
+  }
 
   if (!deletedNote) {
     return NextResponse.json({ message: 'Note not found or unauthorized' }, { status: 404 });
